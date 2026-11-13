@@ -1,0 +1,33 @@
+name: Bug Report
+description: Report an issue, false positive, or triage failure in Apex-RE
+title: "[BUG] <concise description>"
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue in Apex-RE. Please provide sufficient details to reproduce the bug.
+  - type: input
+    id: binary_format
+    attributes:
+      label: Target Format & Runtime
+      description: What executable or engine format was targeted? (e.g. PE32+ x64, Unity IL2CPP, Unreal Engine 5, .NET NativeAOT)
+      placeholder: "e.g. UE5.3 Shipping PE32+ x64"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Steps
+      description: What exact CLI command or prompt did you invoke?
+      placeholder: |
+        1. Run `python scripts/apex_triage.py sample.exe`
+        2. Expected runtime X, but received Y.
+    validations:
+      required: true
+  - type: textarea
+    id: error_output
+    attributes:
+      label: Error Log / Terminal Output
+      description: Paste relevant terminal output or traceback.
+      render: shell

@@ -1,0 +1,29 @@
+name: Feature Request
+description: Propose a new decompiler heuristic, engine unpacker, or analysis module for Apex-RE
+title: "[FEAT] <concise description>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Suggest an enhancement or new reverse engineering module for Apex-RE.
+  - type: input
+    id: feature_summary
+    attributes:
+      label: Feature Summary
+      description: Concise one-line summary of the proposed enhancement.
+      placeholder: "e.g. Automated WASM to C# P/Invoke bridge generator"
+    validations:
+      required: true
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem Statement
+      description: What challenge or reverse engineering bottleneck does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution & Architecture
+      description: How should this be implemented within the 5-layer Apex-RE pipeline?
