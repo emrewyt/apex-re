@@ -164,7 +164,7 @@ Comprehensive documentation included in `skills/apex-re/references/`:
 
 ## <img src="assets/icons/prompt.svg" width="20" height="20" align="center" alt="Prompts" /> Agent Prompts Library
 
-Looking for ready-to-paste prompts for your AI agents? Check out [`PROMPTS.md`](PROMPTS.md) for 8 curated prompt templates in both English and Turkish covering:
+Looking for ready-to-paste prompts for your AI agents? Check out [`PROMPTS.md`](PROMPTS.md) for 10 curated prompt templates in both English and Turkish covering:
 - Unreal Engine 5 Actor Tracing
 - Unity IL2CPP Solution Recovery
 - .NET 8 NativeAOT Deconstruction
@@ -173,9 +173,90 @@ Looking for ready-to-paste prompts for your AI agents? Check out [`PROMPTS.md`](
 - Memory Snapshot State Diffing
 - Multi-Engine Consensus Decompilation
 - Round-Trip Equivalence Verification
+- Wildcard Pattern & RIP-Relative Offset Hunting
+- VM Devirtualization & Backward Slicing
 
 ---
 
-## <img src="assets/icons/shield.svg" width="20" height="20" align="center" alt="License" /> License & Maintainer
+## <img src="assets/icons/folder.svg" width="22" height="22" align="center" alt="Structure" /> Project Structure
 
-Apex-RE is distributed under the **MIT License**. Maintained by **Emre** ([FLUVEA](https://github.com/emrewyt)).
+```text
+apex-re/
+├── .github/
+│   ├── workflows/ci.yml           # Automated cross-platform CI tests (Py 3.8-3.14)
+│   └── ISSUE_TEMPLATE/            # Bug reports and feature request templates
+├── assets/
+│   ├── banner.svg                 # High-resolution vector hero banner
+│   ├── sig-scan-pipeline.svg      # Pattern scanner & RIP resolution architecture
+│   ├── vm-devirt-architecture.svg # VM devirtualization & slicing pipeline
+│   └── icons/                     # Apple/Steam-style vector iconography
+│       ├── terminal.svg, star.svg, bolt.svg, rocket.svg, cpu.svg
+│       ├── document.svg, prompt.svg, shield.svg, folder.svg, test.svg, user.svg
+├── skills/
+│   └── apex-re/
+│       ├── SKILL.md               # Standard skill contract for AI agents
+│       ├── scripts/               # Zero-dependency autonomous analysis utilities
+│       │   ├── apex_triage.py     # Binary triager, entropy & Rich Header parser
+│       │   ├── memory_diff.py     # Dynamic memory state differ & struct builder
+│       │   ├── sig_scan.py        # Wildcard pattern & RIP-relative offset resolver
+│       │   ├── vm_analyzer.py     # VM bytecode interpreter trace analyzer & slicer
+│       │   ├── kaitai_synth.py    # Kaitai Struct (.ksy) format generator
+│       │   └── unflatten_trace.py # OLLVM control flow switch-dispatcher unflattener
+│       └── references/            # 15 in-depth technical guides & deconstruction specs
+│           ├── game-engines-unreal-unity.md
+│           ├── godot-engine.md
+│           ├── dotnet-and-nativeaot.md
+│           ├── desktop-electron-tauri.md
+│           ├── msvc-cmake-native.md
+│           ├── python-bytecodes.md
+│           ├── obfuscation-and-virtual-machines.md
+│           ├── dynamic-memory-diffing.md
+│           ├── symbolic-and-emulation.md
+│           ├── decompilation-consensus.md
+│           ├── pseudocode-to-raw-code.md
+│           ├── verification-loop.md
+│           ├── signature-and-pattern-scanning.md
+│           ├── vm-bytecode-analysis.md
+│           └── compiler-artifacts-and-telemetry.md
+├── tests/
+│   └── test_apex_scripts.py       # 20 automated unit tests (PE, ELF, Mach-O, VM, Diff)
+├── install.sh                     # Linux / macOS 1-line installer
+├── install.ps1                    # Windows PowerShell 1-line installer
+├── push-to-github.sh              # GitHub deployment automation (Bash)
+├── push-to-github.ps1             # GitHub deployment automation (PowerShell)
+├── PROMPTS.md                     # Curated agent prompt library (TR & EN)
+├── CONTRIBUTING.md                # Contribution guidelines
+├── CODE_OF_CONDUCT.md             # Contributor Covenant Code of Conduct
+├── SECURITY.md                    # Security & vulnerability reporting policy
+├── LICENSE                        # MIT License
+└── README.md                      # Documentation, architecture & SEO hub
+```
+
+---
+
+## <img src="assets/icons/test.svg" width="22" height="22" align="center" alt="Testing" /> Testing & Verification
+
+Run the comprehensive unit test suite locally:
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+---
+
+## <img src="assets/icons/shield.svg" width="22" height="22" align="center" alt="Disclaimer" /> Disclaimer
+
+**Apex-RE** is an independent open-source research and engineering framework designed for software comprehension, binary interoperability, defensive analysis, game engine research, and architecture recovery. 
+All trademarks, product names, and logos are the property of their respective owners. Content and code reconstruction workflows are intended strictly for educational, security auditing, and compatibility purposes.
+
+---
+
+## <img src="assets/icons/document.svg" width="22" height="22" align="center" alt="License" /> License
+
+Licensed under the [MIT License](LICENSE).
+
+---
+
+### <img src="assets/icons/user.svg" width="20" height="20" align="center" alt="Author" /> Created by
+**Emre** ([@emrewyt](https://github.com/emrewyt)) · Founder of **FLUVEA**
+
+<sub>**SEO Keywords & Search Indexing:** Reverse engineering skill, AI agent reverse engineering, Antigravity 2.0 skill, Claude Code skill, Codex skill, Cursor skill, Unreal Engine reverse engineering, Unity IL2CPP decompiler, Godot PCK unpacker, .NET NativeAOT deconstruction, memory forensics, dynamic memory diffing, IDA Pro pattern scanner, Cheat Engine signature generator, OLLVM control flow unflattener, VMProtect devirtualizer, Themida trace analyzer, Kaitai Struct synthesizer, SKILL.md specification.</sub>
