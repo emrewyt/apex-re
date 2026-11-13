@@ -79,8 +79,10 @@ The `skills/apex-re/scripts/` directory contains four zero-dependency Python too
 
 | Utility | Purpose | Capabilities |
 | :--- | :--- | :--- |
-| **`apex_triage.py`** | Deep Binary Triager | Parses PE32/PE32+, ELF, Mach-O, WASM. Calculates section Shannon entropy, identifies W+X anomalies, detects packers (UPX, VMProtect, Themida), and fingerprints engines (Unreal, Unity, Godot, .NET NativeAOT, Electron, Tauri, Python). |
+| **`apex_triage.py`** | Deep Binary Triager | Parses PE32/PE32+, ELF, Mach-O, WASM. Calculates Shannon entropy, identifies W+X anomalies, extracts MSVC Rich Header build telemetry, detects packers/VMs, and fingerprints game engines & runtimes. |
 | **`memory_diff.py`** | Memory State Differ | Compares two binary memory dumps (before/after action), isolates variable mutations (int8..int64, float32, float64, pointer), and synthesizes compilable C++ and C# explicit struct definitions. |
+| **`sig_scan.py`** | Signature & Offset Scanner | Wildcard IDA/CE pattern search, automated x86_64 RIP-relative displacement math, and autonomous stable signature synthesis. |
+| **`vm_analyzer.py`** | VM Bytecode Trace Analyzer | Deconstructs obfuscated code virtualization loops. Identifies interpreter dispatchers, strips VIP overhead, and performs backward symbolic register slicing. |
 | **`kaitai_synth.py`** | Kaitai Format Synthesizer | Analyzes binary structures, packets, or save games. Identifies headers, endianness, primitive sequences, and emits valid Kaitai Struct (`.ksy`) YAML specifications. |
 | **`unflatten_trace.py`**| Control Flow Unflattener | Deobfuscates OLLVM state-dispatcher loops. Eliminates the artificial switch machine and reconstructs clean linear C control flow or Mermaid diagrams. |
 
@@ -142,6 +144,21 @@ Comprehensive documentation included in `skills/apex-re/references/`:
 | [`decompilation-consensus.md`](skills/apex-re/references/decompilation-consensus.md) | Reconciling Ghidra, IDA Pro, Binary Ninja, and ILSpy outputs while preventing LLM context starvation. |
 | [`pseudocode-to-raw-code.md`](skills/apex-re/references/pseudocode-to-raw-code.md) | Transforming raw pseudocode into production-ready, compilable C# (.NET 8), modern C++20, and Python. |
 | [`verification-loop.md`](skills/apex-re/references/verification-loop.md) | Differential testing with 1,000 synthetic test vectors under Unicorn to certify 100% equivalence. |
+| [`signature-and-pattern-scanning.md`](skills/apex-re/references/signature-and-pattern-scanning.md) | Dynamic offset tracking, IDA/CE wildcard patterns, and x86_64 RIP-relative displacement math. |
+| [`vm-bytecode-analysis.md`](skills/apex-re/references/vm-bytecode-analysis.md) | Devirtualization pipeline, dispatcher loop filtering, and backward symbolic register slicing. |
+| [`compiler-artifacts-and-telemetry.md`](skills/apex-re/references/compiler-artifacts-and-telemetry.md) | Decoding MSVC Rich Headers (`@comp.id`), toolchain telemetry, and universal symbol demangling. |
+
+---
+
+## <img src="assets/icons/cpu.svg" width="20" height="20" align="center" alt="Deep Workflows" /> Deep Analysis Architecture
+
+<p align="center">
+  <img src="assets/sig-scan-pipeline.svg" alt="Signature Scanning Pipeline" width="100%" />
+</p>
+
+<p align="center">
+  <img src="assets/vm-devirt-architecture.svg" alt="VM Devirtualization Architecture" width="100%" />
+</p>
 
 ---
 

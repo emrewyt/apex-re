@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 340" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect width="880" height="340" rx="12" fill="url(#bg)" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="40" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.2px">VM Devirtualization &amp; Symbolic Backward Slicing Architecture</text>
+  <text x="40" y="68" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Deconstructing obfuscated interpreter dispatchers and reconstructing clean arithmetic formulas</text>
+
+  <!-- Step 1: Trace Ingestion -->
+  <g transform="translate(40, 100)" filter="url(#shadow)">
+    <rect width="180" height="190" rx="8" fill="#21262d" stroke="#da3633" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#da3633"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="600">1. Obfuscated Trace</text>
+    <text x="16" y="70" fill="#ffa198" font-family="ui-monospace, monospace" font-size="10">mov rax, [rsi]</text>
+    <text x="16" y="88" fill="#ffa198" font-family="ui-monospace, monospace" font-size="10">inc rsi</text>
+    <text x="16" y="106" fill="#ffa198" font-family="ui-monospace, monospace" font-size="10">jmp [table+rax*8]</text>
+    <text x="16" y="124" fill="#ffa198" font-family="ui-monospace, monospace" font-size="10">... 100k lines ...</text>
+    <text x="16" y="160" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Repetitive dispatcher</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <path d="M 235 195 L 265 195" stroke="#f85149" stroke-width="2"/>
+  <polygon points="265,191 273,195 265,199" fill="#f85149"/>
+
+  <!-- Step 2: Dispatcher Stripping -->
+  <g transform="translate(280, 100)" filter="url(#shadow)">
+    <rect width="180" height="190" rx="8" fill="#21262d" stroke="#d29922" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#d29922"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="600">2. Dispatcher Filter</text>
+    <text x="16" y="70" fill="#e3b341" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Detect loop head</text>
+    <text x="16" y="90" fill="#e3b341" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Frequency clustering</text>
+    <text x="16" y="110" fill="#e3b341" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Strip VIP updates</text>
+    <text x="16" y="160" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Retains semantic body</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <path d="M 475 195 L 505 195" stroke="#e3b341" stroke-width="2"/>
+  <polygon points="505,191 513,195 505,199" fill="#e3b341"/>
+
+  <!-- Step 3: Handler Categorization -->
+  <g transform="translate(520, 100)" filter="url(#shadow)">
+    <rect width="165" height="190" rx="8" fill="#21262d" stroke="#1f6feb" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#1f6feb"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="600">3. Classify Ops</text>
+    <text x="16" y="70" fill="#58a6ff" font-family="ui-monospace, monospace" font-size="11">VPUSH 0x42</text>
+    <text x="16" y="90" fill="#58a6ff" font-family="ui-monospace, monospace" font-size="11">VALU_XOR 0x55</text>
+    <text x="16" y="110" fill="#58a6ff" font-family="ui-monospace, monospace" font-size="11">VALU_ADD rdx</text>
+    <text x="16" y="160" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Normalized VM IR</text>
+  </g>
+
+  <!-- Arrow 3 -->
+  <path d="M 700 195 L 725 195" stroke="#58a6ff" stroke-width="2"/>
+  <polygon points="725,191 733,195 725,199" fill="#58a6ff"/>
+
+  <!-- Step 4: Slicing & Pure Code -->
+  <g transform="translate(740, 100)" filter="url(#shadow)">
+    <rect width="180" height="190" rx="8" fill="#21262d" stroke="#238636" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#238636"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="600">4. Symbolic Slicing</text>
+    <text x="16" y="70" fill="#7ee787" font-family="ui-monospace, monospace" font-size="10">// Reconstructed C</text>
+    <text x="16" y="90" fill="#7ee787" font-family="ui-monospace, monospace" font-size="10">val = (x ^ 0x55);</text>
+    <text x="16" y="108" fill="#7ee787" font-family="ui-monospace, monospace" font-size="10">return val + y;</text>
+    <text x="16" y="160" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">100% Verified Logic</text>
+  </g>
+</svg>

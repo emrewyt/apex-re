@@ -67,6 +67,19 @@ Deobfuscates OLLVM flattened basic block state machines. Eliminates the central 
 python scripts/unflatten_trace.py <trace.json_or_log> --format c
 ```
 
+### 2.5 Wildcard Pattern & Signature Scanner (`scripts/sig_scan.py`)
+Scans binary buffers with IDA/CE wildcard patterns, autonomously computes x86_64 RIP-relative displacements to resolve target virtual addresses, and synthesizes minimal unique signatures:
+```bash
+python scripts/sig_scan.py scan <binary_file> "<pattern>" [--rip <disp_off> <insn_len>]
+python scripts/sig_scan.py synth <binary_file> <target_offset>
+```
+
+### 2.6 Virtual Machine Bytecode & Trace Analyzer (`scripts/vm_analyzer.py`)
+Deconstructs obfuscated code virtualization loops (VMProtect, Themida, custom interpreters). Detects dispatcher loop heads, strips VIP/dispatcher overhead, and executes backward symbolic register slicing to extract pure arithmetic expressions:
+```bash
+python scripts/vm_analyzer.py <trace.log_or_json> [--slice <reg>]
+```
+
 ---
 
 ## 3. Targeted Technical Reference Navigation
@@ -81,8 +94,11 @@ Always consult the dedicated technical reference corresponding to your target:
 | **Managed & Native Apps** | .NET 3.5 to 10, Single-File Bundles, ReadyToRun, NativeAOT | `references/dotnet-and-nativeaot.md` |
 | **Desktop Web Runtimes** | Electron (ASAR unpacking, IPC channels) & Tauri (Rust core, WebView) | `references/desktop-electron-tauri.md` |
 | **Native C/C++** | MSVC, CMake, Clang, PE/ELF calling conventions, RTTI, VTables | `references/msvc-cmake-native.md` |
+| **Compiler Telemetry** | MSVC Rich Header (`@comp.id`), build counts, symbol demangling | `references/compiler-artifacts-and-telemetry.md` |
+| **Signature Scanning** | Dynamic offset tracking, IDA patterns, RIP-relative math | `references/signature-and-pattern-scanning.md` |
 | **Python** | PyInstaller unpacking, .pyc headers, pycdc decompilation, PyArmor | `references/python-bytecodes.md` |
-| **Obfuscation & VMs** | Control Flow Flattening (OLLVM), Opaque Predicates, VMProtect/Themida | `references/obfuscation-and-virtual-machines.md` |
+| **Obfuscation & VMs** | Control Flow Flattening (OLLVM), Opaque Predicates, Devirtualization | `references/obfuscation-and-virtual-machines.md` |
+| **VM Bytecode Analysis**| Dispatcher detection, VIP stripping, backward symbolic slicing | `references/vm-bytecode-analysis.md` |
 | **Memory / RAM** | Dynamic snapshot diffing, pointer chains, Frida memory hooks | `references/dynamic-memory-diffing.md` |
 | **Symbolic & Emulation**| Unicorn Engine, Qiling Framework, angr path exploration, Z3 solver | `references/symbolic-and-emulation.md` |
 | **Consensus Decompilation**| Reconciling Ghidra, IDA Pro, Binary Ninja, and ILSpy outputs | `references/decompilation-consensus.md` |

@@ -21,6 +21,8 @@ from apex_triage import BinaryTriager, calculate_entropy, format_text_report
 from memory_diff import MemoryDiffer
 from kaitai_synth import KaitaiSynthesizer
 from unflatten_trace import ControlFlowUnflattener
+from sig_scan import PatternScanner
+from vm_analyzer import VMAnalyzer
 
 class TestApexTriage(unittest.TestCase):
     def setUp(self):
@@ -384,6 +386,150 @@ class TestUnflattenTrace(unittest.TestCase):
         self.assertIn("goto state_0x1E;", c_code)
         self.assertIn("goto state_0x28;", c_code)
         self.assertIn("goto state_0x14;", c_code)
+
+class TestPatternScanner(unittest.TestCase):
+    def test_ida_pattern_parsing(self):
+        pat_str = "48 8B 05 ? ? ? ? 48 85 C0"
+        pat, mask = PatternScanner.parse_ida_pattern(pat_str)
+        self.assertEqual(len(pat), 10)
+        self.assertEqual(len(mask), 10)
+        self.assertEqual(pat[0:3], b"\x48\x8B\x05")
+        self.assertEqual(mask[0:3], b"\xFF\xFF\xFF")
+        self.assertEqual(mask[3:7], b"\x00\x00\x00\x00") # Wildcards
+        self.assertEqual(pat[7:10], b"\x48\x85\xC0")
+        self.assertEqual(mask[7:10], b"\xFF\xFF\xFF")
+
+    def test_scan_pattern_with_wildcards(self):
+        # Buffer containing concrete bytes matching wildcard pattern
+        data = b"\x90" * 32 + b"\x48\x8B\x05\x12\x34\x56\x78\x48\x85\xC0" + b"\xCC" * 16
+        pat, mask = PatternScanner.parse_ida_pattern("48 8B 05 ? ? ? ? 48 85 C0")
+        matches = PatternScanner.scan_pattern(data, pat, mask)
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0], 32)
+
+    def test_rip_relative_resolution(self):
+        # Instruction: mov rax, [rip + 0x100] at offset 0x20
+        # In x64: 48 8B 05 00 01 00 00 (7 bytes, disp at offset +3)
+        data = bytearray(0x200)
+        data[0x20:0x27] = b"\x48\x8B\x05" + struct.pack("<i", 0x100)
+        res = PatternScanner.resolve_rip_relative(bytes(data), match_offset=0x20,
+                                                  disp_offset_within_match=3,
+                                                  instruction_length=7,
+                                                  image_base=0x140000000)
+        # Next RIP = 0x20 + 7 = 0x27
+        # Target RVA = 0x27 + 0x100 = 0x127
+        # Target VA = 0x140000000 + 0x127 = 0x140000127
+        self.assertEqual(res["target_rva"], "0x127")
+        self.assertEqual(res["target_va"], "0x140000127")
+
+    def test_synthesize_unique_signature(self):
+        # Create buffer with random-like unique pattern at offset 0x40
+        data = bytearray(b"\x90" * 0x100)
+        unique_bytes = b"\x48\x89\x5C\x24\x08\x57\x48\x83\xEC\x20\x48\x8B\xD9"
+        data[0x40:0x40+len(unique_bytes)] = unique_bytes
+
+        sig_info = PatternScanner.synthesize_unique_signature(bytes(data), target_offset=0x40)
+        self.assertIsNotNone(sig_info)
+        self.assertTrue(sig_info["unique"])
+        self.assertEqual(sig_info["offset"], 0x40)
+        self.assertIn("48 89 5C 24 08", sig_info["pattern"])
+
+class TestVMAnalyzer(unittest.TestCase):
+    def test_vm_dispatcher_detection_and_slicing(self):
+        trace = [
+            # Dispatcher loop executing multiple times
+            {"address": 0x1000, "mnemonic": "mov", "operands": "rax, [rsi]", "raw": "mov rax, [rsi]"},
+            {"address": 0x1003, "mnemonic": "add", "operands": "rsi, 8", "raw": "add rsi, 8"},
+            {"address": 0x1007, "mnemonic": "jmp", "operands": "[table + rax*8]", "raw": "jmp [table + rax*8]"},
+            # Handler 1: VPUSH
+            {"address": 0x2000, "mnemonic": "mov", "operands": "rbx, 0x42", "raw": "mov rbx, 0x42"},
+            # Dispatcher loop repeat
+            {"address": 0x1000, "mnemonic": "mov", "operands": "rax, [rsi]", "raw": "mov rax, [rsi]"},
+            {"address": 0x1003, "mnemonic": "add", "operands": "rsi, 8", "raw": "add rsi, 8"},
+            {"address": 0x1007, "mnemonic": "jmp", "operands": "[table + rax*8]", "raw": "jmp [table + rax*8]"},
+            # Handler 2: VALU XOR
+            {"address": 0x3000, "mnemonic": "xor", "operands": "rbx, 0x55", "raw": "xor rbx, 0x55"},
+            # Dispatcher loop repeat
+            {"address": 0x1000, "mnemonic": "mov", "operands": "rax, [rsi]", "raw": "mov rax, [rsi]"},
+            {"address": 0x1003, "mnemonic": "add", "operands": "rsi, 8", "raw": "add rsi, 8"},
+            {"address": 0x1007, "mnemonic": "jmp", "operands": "[table + rax*8]", "raw": "jmp [table + rax*8]"},
+            # Exit handler
+            {"address": 0x4000, "mnemonic": "mov", "operands": "rax, rbx", "raw": "mov rax, rbx"}
+        ]
+        analyzer = VMAnalyzer()
+        analyzer.trace = trace
+
+        dispatchers = analyzer.detect_dispatcher_loop(min_repetitions=3)
+        self.assertIn(0x1000, dispatchers)
+        self.assertIn(0x1003, dispatchers)
+        self.assertIn(0x1007, dispatchers)
+
+        filtered = analyzer.filter_dispatcher_overhead()
+        # Dispatcher instructions should be removed
+        filtered_addrs = [e["address"] for e in filtered]
+        self.assertNotIn(0x1000, filtered_addrs)
+        self.assertIn(0x2000, filtered_addrs)
+        self.assertIn(0x3000, filtered_addrs)
+        self.assertIn(0x4000, filtered_addrs)
+
+        sliced = analyzer.backward_slice("rax")
+        self.assertTrue(len(sliced) >= 2)
+        expr = analyzer.synthesize_expression("rax")
+        self.assertIn("xor rbx, 0x55", expr)
+        self.assertIn("mov rax, rbx", expr)
+
+class TestRichHeaderAndAntiAnalysis(unittest.TestCase):
+    def test_pe_rich_header_and_anti_analysis(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            # Construct PE with Rich Header
+            xor_key = 0x12345678
+            dos_stub = bytearray(0x100)
+            dos_stub[0:2] = b"MZ"
+            pe_off = 0x80
+            struct.pack_into("<I", dos_stub, 0x3C, pe_off)
+
+            # Insert DanS ... Rich block inside DOS stub
+            # DanS at 0x40
+            dans_enc = struct.pack("<I", 0x536E6144 ^ xor_key) # "DanS"
+            dos_stub[0x40:0x44] = dans_enc
+            # 3 zero dwords
+            dos_stub[0x44:0x50] = struct.pack("<III", 0 ^ xor_key, 0 ^ xor_key, 0 ^ xor_key)
+
+            # Record 1: Prod 0x0104 (VS2019/VS2022 C++), Build 31332, Count 15
+            comp_id_1 = (0x0104 << 16) | 31332
+            dos_stub[0x50:0x58] = struct.pack("<II", comp_id_1 ^ xor_key, 15 ^ xor_key)
+
+            # Rich marker at 0x58
+            dos_stub[0x58:0x5C] = b"Rich"
+            dos_stub[0x5C:0x60] = struct.pack("<I", xor_key)
+
+            # PE Header at 0x80
+            pe_hdr = bytearray(0x80)
+            pe_hdr[0:4] = b"PE\x00\x00"
+            struct.pack_into("<H", pe_hdr, 4, 0x8664) # x64
+
+            # Add payload with anti-debugging API
+            payload = b"IsDebuggerPresent CheckRemoteDebuggerPresent"
+
+            with open(tmp_path, "wb") as f:
+                f.write(dos_stub[:pe_off] + pe_hdr + payload)
+
+            triager = BinaryTriager(tmp_path)
+            res = triager.analyze()
+
+            self.assertTrue(len(res["rich_header"]) > 0)
+            self.assertEqual(res["rich_header"][0]["tool"], "VS2019/VS2022 C++ Compiler")
+            self.assertEqual(res["rich_header"][0]["build_id"], 31332)
+            self.assertEqual(res["rich_header"][0]["count"], 15)
+
+            self.assertIn("IsDebuggerPresent", res["anti_analysis"])
+            self.assertIn("CheckRemoteDebuggerPresent", res["anti_analysis"])
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
 if __name__ == "__main__":
     unittest.main()

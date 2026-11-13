@@ -43,6 +43,8 @@ class BinaryTriager:
             "runtimes": [],
             "game_engine": None,
             "packers_and_protections": [],
+            "rich_header": [],
+            "anti_analysis": [],
             "sections": [],
             "anomalies": []
         }
@@ -93,6 +95,7 @@ class BinaryTriager:
         if len(header) < 0x40:
             return
         pe_offset = struct.unpack_from("<I", header, 0x3C)[0]
+        self._parse_rich_header(header, pe_offset)
         if pe_offset + 24 > len(header):
             # Read further if pe_offset is outside 4KB
             with open(self.file_path, "rb") as f:
@@ -176,6 +179,58 @@ class BinaryTriager:
                 "executable": is_executable,
                 "writable": is_writable
             })
+
+    def _parse_rich_header(self, header: bytes, pe_offset: int):
+        """Parses MSVC Rich Header (compiler product IDs and telemetry)."""
+        limit = min(pe_offset, len(header), 4096)
+        stub = header[:limit]
+        rich_idx = stub.find(b"Rich")
+        if rich_idx == -1 or rich_idx + 8 > len(stub):
+            return
+
+        xor_key = struct.unpack_from("<I", stub, rich_idx + 4)[0]
+        # Search backward for DanS xor'd with xor_key
+        dans_magic = struct.pack("<I", 0x536E6144 ^ xor_key) # "DanS"
+        dans_idx = stub.rfind(dans_magic, 0, rich_idx)
+        if dans_idx == -1:
+            return
+
+        # Entry records are 8 bytes each between dans_idx + 16 (after padding) and rich_idx
+        prod_map = {
+            0x00EB: "VS2015 Resource Compiler",
+            0x00FF: "VS2015 C++ Compiler",
+            0x0102: "VS2017 Linker",
+            0x0103: "VS2017 C++ Compiler",
+            0x0104: "VS2019/VS2022 C++ Compiler",
+            0x0105: "VS2019/VS2022 Linker",
+            0x0107: "VS2019/VS2022 MASM",
+            0x0014: "VS2010 C++ Compiler",
+            0x001A: "VS2012 C++ Compiler",
+            0x00DE: "VS2013 C++ Compiler"
+        }
+
+        entry_start = dans_idx + 16
+        while entry_start + 8 <= rich_idx:
+            comp_id_enc = struct.unpack_from("<I", stub, entry_start)[0]
+            count_enc = struct.unpack_from("<I", stub, entry_start + 4)[0]
+            comp_id = comp_id_enc ^ xor_key
+            count = count_enc ^ xor_key
+
+            prod_id = (comp_id >> 16) & 0xFFFF
+            build_id = comp_id & 0xFFFF
+            tool_name = prod_map.get(prod_id, f"Tool_0x{prod_id:04X}")
+
+            self.results["rich_header"].append({
+                "product_id": f"0x{prod_id:04X}",
+                "build_id": build_id,
+                "tool": tool_name,
+                "count": count
+            })
+            entry_start += 8
+
+        if self.results["rich_header"]:
+            if "MSVC Toolchain (Rich Header Verified)" not in self.results["runtimes"]:
+                self.results["runtimes"].append("MSVC Toolchain (Rich Header Verified)")
 
     def _parse_elf(self, header: bytes):
         self.results["format"] = "ELF (Executable and Linkable Format)"
@@ -414,6 +469,19 @@ class BinaryTriager:
             if indicator not in self.results["packers_and_protections"]:
                 self.results["packers_and_protections"].append(indicator)
 
+        # Anti-analysis heuristics
+        anti_apis = [
+            b"IsDebuggerPresent", b"CheckRemoteDebuggerPresent", b"NtQueryInformationProcess",
+            b"OutputDebugStringA", b"OutputDebugStringW", b"QueryPerformanceCounter"
+        ]
+        with open(self.file_path, "rb") as f:
+            sample = f.read(min(self.file_size, 5 * 1024 * 1024))
+            for api in anti_apis:
+                if api in sample:
+                    name = api.decode("ascii")
+                    if name not in self.results["anti_analysis"]:
+                        self.results["anti_analysis"].append(name)
+
 def format_text_report(res: Dict[str, Any]) -> str:
     lines = []
     lines.append("=" * 72)
@@ -429,6 +497,11 @@ def format_text_report(res: Dict[str, Any]) -> str:
         lines.append(f"  Game Engine   : {res['game_engine']}")
     lines.append(f"  Runtimes      : {', '.join(res['runtimes']) if res['runtimes'] else 'Pure Native / Unidentified'}")
     lines.append(f"  Protections   : {', '.join(res['packers_and_protections']) if res['packers_and_protections'] else 'None Detected'}")
+    if res.get("anti_analysis"):
+        lines.append(f"  Anti-Analysis : {', '.join(res['anti_analysis'])}")
+    if res.get("rich_header"):
+        tools = [f"{t['tool']} (b{t['build_id']}, count:{t['count']})" for t in res["rich_header"][:4]]
+        lines.append(f"  Rich Header   : {', '.join(tools)}")
 
     if res["sections"]:
         lines.append("-" * 72)

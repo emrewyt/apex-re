@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 320" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#388bfd"/>
+      <stop offset="100%" stop-color="#58a6ff"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#238636"/>
+      <stop offset="100%" stop-color="#3fb950"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8957e5"/>
+      <stop offset="100%" stop-color="#bc8cff"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect width="880" height="320" rx="12" fill="url(#bg)" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="40" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.2px">Autonomous Signature Scanning &amp; RIP-Relative Address Resolution</text>
+  <text x="40" y="68" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Dynamic offset tracking across updates and multi-platform binary compilation</text>
+
+  <!-- Step 1: Pattern Search -->
+  <g transform="translate(40, 100)" filter="url(#shadow)">
+    <rect width="230" height="170" rx="8" fill="#21262d" stroke="#388bfd" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#388bfd"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">1. Wildcard Matching</text>
+    <text x="16" y="70" fill="#c9d1d9" font-family="ui-monospace, monospace" font-size="11">48 8B 05 ?? ?? ?? ??</text>
+    <text x="16" y="90" fill="#c9d1d9" font-family="ui-monospace, monospace" font-size="11">48 85 C0 74 ?? 48 8B</text>
+    <text x="16" y="125" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Masked byte array scanner</text>
+    <text x="16" y="145" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Zero-overhead byte search</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <path d="M 285 185 L 325 185" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+  <polygon points="325,181 333,185 325,189" fill="#58a6ff"/>
+
+  <!-- Step 2: RIP-Relative Math -->
+  <g transform="translate(345, 100)" filter="url(#shadow)">
+    <rect width="240" height="170" rx="8" fill="#21262d" stroke="#8957e5" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#8957e5"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">2. RIP Displacement Math</text>
+    <text x="16" y="70" fill="#d2a8ff" font-family="ui-monospace, monospace" font-size="11">NextRIP = Off + InsnLen</text>
+    <text x="16" y="90" fill="#d2a8ff" font-family="ui-monospace, monospace" font-size="11">RVA = NextRIP + Disp32</text>
+    <text x="16" y="110" fill="#d2a8ff" font-family="ui-monospace, monospace" font-size="11">TargetVA = ImageBase + RVA</text>
+    <text x="16" y="145" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Resolves global singletons</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <path d="M 600 185 L 640 185" stroke="#bc8cff" stroke-width="2"/>
+  <polygon points="640,181 648,185 640,189" fill="#bc8cff"/>
+
+  <!-- Step 3: Synthesis -->
+  <g transform="translate(660, 100)" filter="url(#shadow)">
+    <rect width="180" height="170" rx="8" fill="#21262d" stroke="#238636" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="6" rx="3" fill="#238636"/>
+    <text x="16" y="44" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">3. Code Generation</text>
+    <text x="16" y="70" fill="#7ee787" font-family="ui-monospace, monospace" font-size="11">C++ #define</text>
+    <text x="16" y="90" fill="#7ee787" font-family="ui-monospace, monospace" font-size="11">C# .NET 8 const</text>
+    <text x="16" y="110" fill="#7ee787" font-family="ui-monospace, monospace" font-size="11">JSON AST records</text>
+    <text x="16" y="145" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Ready-to-use bindings</text>
+  </g>
+</svg>

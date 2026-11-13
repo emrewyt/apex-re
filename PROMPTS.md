@@ -14,6 +14,8 @@ Curated system prompt templates and task directives for AI coding agents (Antigr
 - [6. Dynamic Memory Snapshot Diffing](#6-dynamic-memory-snapshot-diffing)
 - [7. Multi-Engine Consensus Decompilation](#7-multi-engine-consensus-decompilation)
 - [8. Round-Trip Equivalence Verification](#8-round-trip-equivalence-verification)
+- [9. Wildcard Pattern & RIP-Relative Offset Hunting](#9-wildcard-pattern--rip-relative-offset-hunting)
+- [10. VM Devirtualization & Backward Slicing](#10-vm-devirtualization--backward-slicing)
 
 ---
 
@@ -225,4 +227,58 @@ Eylem Planı:
 3. Sınır değerleri (0, -1, INT_MAX, NULL) ve rastgele baytları kapsayan 1.000 adet test vektörü üret.
 4. `references/verification-loop.md` kılavuzunu izleyerek yerel dilimi Unicorn Engine üzerinde, yeni kodu ise test harness üzerinde çalıştır.
 5. Sıfır fark ile 1.000 / 1.000 eşleşmeyi kanıtlayan doğrulama raporunu teslim et.
+```
+
+---
+
+## 9. Wildcard Pattern & RIP-Relative Offset Hunting
+
+### English Prompt
+```text
+Task: Dynamically resolve the global GameWorld singleton address across game patches using wildcard pattern scanning.
+Target: GameClient-Win64-Shipping.exe
+Action Plan:
+1. Run `python skills/apex-re/scripts/sig_scan.py scan <binary> "48 8B 05 ? ? ? ? 48 85 C0" --rip 3 7`
+2. Calculate target RVA = NextRIP + Displacement.
+3. Consult `references/signature-and-pattern-scanning.md` for stable pattern synthesis.
+4. Emit modern C++20 offset macros and C# (.NET 8) static accessors.
+```
+
+### Türkçe Prompt
+```text
+Görev: Güncellemeler sonrasında global GameWorld singleton adresini dinamik olarak tespit etmek için wildcard pattern taraması yap.
+Hedef: GameClient-Win64-Shipping.exe
+Eylem Planı:
+1. `python skills/apex-re/scripts/sig_scan.py scan <binary> "48 8B 05 ? ? ? ? 48 85 C0" --rip 3 7` komutunu çalıştır.
+2. Hedef RVA = NextRIP + Displacement formülüyle kesin sanal adresi hesapla.
+3. Gelecek yamalarda bozulmayacak stabil imza sentezi için `references/signature-and-pattern-scanning.md` rehberini incele.
+4. C++20 ofset makrolarını ve C# (.NET 8) statik sınıflarını üret.
+```
+
+---
+
+## 10. VM Devirtualization & Backward Slicing
+
+### English Prompt
+```text
+Task: Devirtualize a VMProtect / Themida bytecode execution trace and recover the clean mathematical algorithm.
+Target: trace.log (execution trace of virtualized handler loop)
+Action Plan:
+1. Run `python skills/apex-re/scripts/vm_analyzer.py trace.log --slice rax`
+2. Filter repetitive VIP incrementation and dispatcher jump table overhead.
+3. Classify handlers into VPUSH, VPOP, and VALU operations per `references/vm-bytecode-analysis.md`.
+4. Perform backward dependency slicing on RAX to extract the pure arithmetic formula.
+5. Reconstruct high-level compilable C / C# code without virtual machine artifacts.
+```
+
+### Türkçe Prompt
+```text
+Görev: VMProtect / Themida sanallaştırılmış bytecode yürütme kaydını analiz et ve altındaki saf matematiksel algoritmayı kurtar.
+Hedef: trace.log (sanallaştırılmış döngü yürütme izi)
+Eylem Planı:
+1. `python skills/apex-re/scripts/vm_analyzer.py trace.log --slice rax` komutunu çalıştır.
+2. Tekrarlayan VIP artırma ve dispatcher sıçrama yükünü filtrele.
+3. `references/vm-bytecode-analysis.md` rehberine göre handlerları VPUSH, VPOP ve VALU olarak sınıflandır.
+4. RAX hedef kaydı üzerinde geriye dönük bağımlılık dilimlemesi (backward slicing) yaparak saf formülü izole et.
+5. Sanal makine kalıntılarından arındırılmış, derlenebilir temiz C / C# kodunu teslim et.
 ```
