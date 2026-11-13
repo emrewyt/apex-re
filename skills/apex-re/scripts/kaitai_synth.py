@@ -106,37 +106,43 @@ class KaitaiSynthesizer:
                     continue
 
             # Standard primitives
+            is_u64 = False
             if rem >= 8 and (offset % 8 == 0 or rem == 8):
                 val_u64 = struct.unpack_from(f"{prefix}Q", self.data, offset)[0]
-                self.fields.append({
-                    "id": f"val64_{field_counter:02d}",
-                    "type": f"u8",
-                    "doc": f"Offset 0x{offset:04X} (value: {val_u64})"
-                })
-                offset += 8
-            elif rem >= 4:
-                val_u32 = struct.unpack_from(f"{prefix}I", self.data, offset)[0]
-                self.fields.append({
-                    "id": f"uint_{field_counter:02d}",
-                    "type": "u4",
-                    "doc": f"Offset 0x{offset:04X} (uint32: {val_u32} / 0x{val_u32:X})"
-                })
-                offset += 4
-            elif rem >= 2:
-                val_u16 = struct.unpack_from(f"{prefix}H", self.data, offset)[0]
-                self.fields.append({
-                    "id": f"word_{field_counter:02d}",
-                    "type": "u2",
-                    "doc": f"Offset 0x{offset:04X} (uint16: {val_u16})"
-                })
-                offset += 2
-            else:
-                self.fields.append({
-                    "id": f"byte_{field_counter:02d}",
-                    "type": "u1",
-                    "doc": f"Offset 0x{offset:04X} (raw byte: 0x{self.data[offset]:02X})"
-                })
-                offset += 1
+                # True 64-bit integer indicated by non-zero upper 32-bits (timestamps, 64-bit GUIDs, offsets)
+                if val_u64 > 0xFFFFFFFF:
+                    is_u64 = True
+                    self.fields.append({
+                        "id": f"val64_{field_counter:02d}",
+                        "type": "u8",
+                        "doc": f"Offset 0x{offset:04X} (uint64: {val_u64} / 0x{val_u64:X})"
+                    })
+                    offset += 8
+
+            if not is_u64:
+                if rem >= 4:
+                    val_u32 = struct.unpack_from(f"{prefix}I", self.data, offset)[0]
+                    self.fields.append({
+                        "id": f"uint_{field_counter:02d}",
+                        "type": "u4",
+                        "doc": f"Offset 0x{offset:04X} (uint32: {val_u32} / 0x{val_u32:X})"
+                    })
+                    offset += 4
+                elif rem >= 2:
+                    val_u16 = struct.unpack_from(f"{prefix}H", self.data, offset)[0]
+                    self.fields.append({
+                        "id": f"word_{field_counter:02d}",
+                        "type": "u2",
+                        "doc": f"Offset 0x{offset:04X} (uint16: {val_u16})"
+                    })
+                    offset += 2
+                else:
+                    self.fields.append({
+                        "id": f"byte_{field_counter:02d}",
+                        "type": "u1",
+                        "doc": f"Offset 0x{offset:04X} (raw byte: 0x{self.data[offset]:02X})"
+                    })
+                    offset += 1
             field_counter += 1
 
         # Emit Kaitai Struct YAML

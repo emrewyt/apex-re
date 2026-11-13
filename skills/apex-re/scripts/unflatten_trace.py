@@ -95,17 +95,36 @@ class ControlFlowUnflattener:
         lines.append("")
         lines.append("void reconstructed_function() {")
 
+        if self.entry_state is None:
+            lines.append("}")
+            return "\n".join(lines)
+
+        # Collect reachable states in topological / BFS order
+        reachable = []
+        queue = [self.entry_state]
         visited = set()
-        curr: Optional[int] = self.entry_state
+        while queue:
+            st = queue.pop(0)
+            if st in visited:
+                continue
+            visited.add(st)
+            reachable.append(st)
+            handler = self.state_handlers.get(st, {})
+            for nxt, _ in handler.get("successors", []):
+                if nxt not in visited and nxt not in queue:
+                    queue.append(nxt)
 
-        while curr is not None and curr not in visited:
-            visited.add(curr)
-            handler = self.state_handlers.get(curr)
+        # Include any remaining disconnected handlers
+        for st in self.state_handlers:
+            if st not in visited:
+                reachable.append(st)
+
+        for idx, st in enumerate(reachable):
+            handler = self.state_handlers.get(st)
             if not handler:
-                lines.append(f"    // Warning: Unresolved state 0x{curr:X}")
-                break
+                continue
 
-            lines.append(f"    // State 0x{curr:X} [{handler['block']}]")
+            lines.append(f"state_0x{st:X}: // [{handler['block']}]")
             if handler["code"]:
                 for c_line in handler["code"].split(";"):
                     c_line = c_line.strip()
@@ -115,27 +134,29 @@ class ControlFlowUnflattener:
             successors = handler["successors"]
             if not successors:
                 lines.append("    return;")
-                curr = None
             elif len(successors) == 1:
                 next_st, _ = successors[0]
-                if next_st in visited:
-                    lines.append(f"    // Loop back-edge detected -> State 0x{next_st:X}")
-                    lines.append(f"    goto state_0x{next_st:X};")
-                    curr = None
+                if idx + 1 < len(reachable) and reachable[idx + 1] == next_st:
+                    # Natural fallthrough to next sequential block
+                    pass
                 else:
-                    curr = next_st
-            else:
-                # Conditional branching
+                    lines.append(f"    goto state_0x{next_st:X};")
+            elif len(successors) == 2:
                 s1, c1 = successors[0]
                 s2, c2 = successors[1]
                 cond_str = c1 or "condition"
                 lines.append(f"    if ({cond_str}) {{")
-                lines.append(f"        // Branch to state 0x{s1:X}")
+                lines.append(f"        goto state_0x{s1:X};")
                 lines.append(f"    }} else {{")
-                lines.append(f"        // Branch to state 0x{s2:X}")
+                lines.append(f"        goto state_0x{s2:X};")
                 lines.append(f"    }}")
-                # Follow main branch
-                curr = s1 if s1 not in visited else (s2 if s2 not in visited else None)
+            else:
+                lines.append("    switch (branch_selector) {")
+                for c_idx, (s_next, c_cond) in enumerate(successors):
+                    c_tag = c_cond or f"case_{c_idx}"
+                    lines.append(f"        case {c_idx}: // {c_tag}")
+                    lines.append(f"            goto state_0x{s_next:X};")
+                lines.append("    }")
 
         lines.append("}")
         return "\n".join(lines)

@@ -9,6 +9,7 @@ Zero dependencies (Python 3 standard library).
 import sys
 import os
 import struct
+import math
 import json
 import argparse
 from typing import Dict, Any, List, Optional, Tuple
@@ -30,13 +31,16 @@ class MemoryDiffer:
             # Check slice if alignment > 1, else single byte
             slice_end = min(i + step, self.min_len)
             if self.buf_a[i:slice_end] != self.buf_b[i:slice_end]:
-                # Found difference within this aligned block
+                # Found difference within this aligned block; locate first differing byte
+                diff_sub = next((k for k in range(slice_end - i) if self.buf_a[i + k] != self.buf_b[i + k]), 0)
+                byte_a = self.buf_a[i + diff_sub]
+                byte_b = self.buf_b[i + diff_sub]
                 types = self._interpret_types(i)
                 self.diffs.append({
                     "offset": i,
                     "address": f"0x{self.base_addr + i:X}",
-                    "byte_before": self.buf_a[i],
-                    "byte_after": self.buf_b[i],
+                    "byte_before": byte_a,
+                    "byte_after": byte_b,
                     "interpretations": types
                 })
             i += step
@@ -81,8 +85,8 @@ class MemoryDiffer:
             interp["u64"] = {"before": u64_a, "after": u64_b, "delta": u64_b - u64_a}
             interp["i64"] = {"before": s64_a, "after": s64_b, "delta": s64_b - s64_a}
             interp["f64"] = {"before": round(f64_a, 6), "after": round(f64_b, 6), "delta": round(f64_b - f64_a, 6)}
-            # Check if looks like 64-bit user pointer (0x0000000000010000 .. 0x00007FFFFFFFFFFF)
-            if 0x10000 <= u64_b <= 0x7FFFFFFFFFFF:
+            # Check if looks like 64-bit user pointer (aligned to 8 bytes, address range: 0x0000000000010000 .. 0x00007FFFFFFFFFFF)
+            if offset % 8 == 0 and 0x10000 <= u64_b <= 0x7FFFFFFFFFFF:
                 interp["ptr64"] = {"before": f"0x{u64_a:016X}", "after": f"0x{u64_b:016X}"}
 
         return interp
@@ -104,17 +108,25 @@ class MemoryDiffer:
             cs_type = "byte"
             size = 1
 
-            if "ptr64" in types:
+            has_ptr = "ptr64" in types and off % 8 == 0 and (types.get("u64", {}).get("after", 0) > 0xFFFFFFFF or types.get("u64", {}).get("before", 0) > 0xFFFFFFFF)
+            has_f32 = "f32" in types and abs(types["f32"]["delta"]) > 0.0001 and not math.isnan(types["f32"]["after"]) and not math.isinf(types["f32"]["after"])
+            has_i32 = "i32" in types and types["i32"]["delta"] != 0 and off % 4 == 0
+
+            if has_ptr:
                 chosen_type = "uintptr_t"
                 cs_type = "IntPtr"
                 size = 8
-            elif "f32" in types and abs(types["f32"]["delta"]) > 0.0001 and not math.isnan(types["f32"]["after"]):
+            elif has_f32 and (not has_i32 or abs(types["f32"]["after"] - round(types["f32"]["after"])) > 0.0001 or abs(types["f32"]["before"] - round(types["f32"]["before"])) > 0.0001):
                 chosen_type = "float"
                 cs_type = "float"
                 size = 4
-            elif "i32" in types and off % 4 == 0:
+            elif has_i32:
                 chosen_type = "int32_t"
                 cs_type = "int"
+                size = 4
+            elif has_f32:
+                chosen_type = "float"
+                cs_type = "float"
                 size = 4
             elif "u32" in types and off % 4 == 0:
                 chosen_type = "uint32_t"

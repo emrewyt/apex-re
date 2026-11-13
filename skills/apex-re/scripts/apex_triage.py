@@ -147,11 +147,16 @@ class BinaryTriager:
             characteristics = struct.unpack_from("<I", sec_data, offset + 36)[0]
 
             sec_entropy = 0.0
-            if raw_size > 0 and raw_ptr + raw_size <= self.file_size:
-                with open(self.file_path, "rb") as f:
-                    f.seek(raw_ptr)
-                    s_bytes = f.read(min(raw_size, 1024 * 512))
-                    sec_entropy = calculate_entropy(s_bytes)
+            if raw_size > 0:
+                if raw_ptr + raw_size > self.file_size:
+                    self.results["anomalies"].append(
+                        f"Section {name} raw data points beyond file boundaries (pointer 0x{raw_ptr:X}, size 0x{raw_size:X}, file size 0x{self.file_size:X})"
+                    )
+                else:
+                    with open(self.file_path, "rb") as f:
+                        f.seek(raw_ptr)
+                        s_bytes = f.read(min(raw_size, 1024 * 512))
+                        sec_entropy = calculate_entropy(s_bytes)
 
             is_executable = bool(characteristics & 0x20000000)
             is_writable = bool(characteristics & 0x80000000)
@@ -181,17 +186,6 @@ class BinaryTriager:
         self.results["endianness"] = "little" if ei_data == 1 else "big"
         fmt = "<" if ei_data == 1 else ">"
 
-        if ei_class == 1:
-            self.results["format"] = "ELF32"
-            machine = struct.unpack_from(f"{fmt}H", header, 18)[0]
-            entry = struct.unpack_from(f"{fmt}I", header, 24)[0]
-            self.results["entry_point"] = f"0x{entry:X}"
-        else:
-            self.results["format"] = "ELF64"
-            machine = struct.unpack_from(f"{fmt}H", header, 18)[0]
-            entry = struct.unpack_from(f"{fmt}Q", header, 24)[0]
-            self.results["entry_point"] = f"0x{entry:X}"
-
         elf_machines = {
             0x03: "x86",
             0x3E: "x64 (x86_64)",
@@ -199,17 +193,147 @@ class BinaryTriager:
             0xB7: "AArch64 (ARM64)",
             0xF3: "RISC-V"
         }
+
+        if ei_class == 1:
+            self.results["format"] = "ELF32"
+            machine = struct.unpack_from(f"{fmt}H", header, 18)[0]
+            entry = struct.unpack_from(f"{fmt}I", header, 24)[0]
+            shoff = struct.unpack_from(f"{fmt}I", header, 32)[0]
+            shentsize = struct.unpack_from(f"{fmt}H", header, 46)[0]
+            shnum = struct.unpack_from(f"{fmt}H", header, 48)[0]
+            shstrndx = struct.unpack_from(f"{fmt}H", header, 50)[0]
+            self.results["entry_point"] = f"0x{entry:X}"
+        else:
+            self.results["format"] = "ELF64"
+            if len(header) < 64:
+                return
+            machine = struct.unpack_from(f"{fmt}H", header, 18)[0]
+            entry = struct.unpack_from(f"{fmt}Q", header, 24)[0]
+            shoff = struct.unpack_from(f"{fmt}Q", header, 40)[0]
+            shentsize = struct.unpack_from(f"{fmt}H", header, 58)[0]
+            shnum = struct.unpack_from(f"{fmt}H", header, 60)[0]
+            shstrndx = struct.unpack_from(f"{fmt}H", header, 62)[0]
+            self.results["entry_point"] = f"0x{entry:X}"
+
         self.results["architecture"] = elf_machines.get(machine, f"ELF Machine 0x{machine:02X}")
+
+        # Parse ELF Sections if present
+        if shoff > 0 and shnum > 0 and shentsize > 0 and shoff + (shnum * shentsize) <= self.file_size:
+            try:
+                with open(self.file_path, "rb") as f:
+                    f.seek(shoff)
+                    sh_data = f.read(shnum * shentsize)
+
+                    shstrtab = b""
+                    if shstrndx < shnum:
+                        str_offset = shstrndx * shentsize
+                        if ei_class == 1 and str_offset + 24 <= len(sh_data):
+                            tab_off = struct.unpack_from(f"{fmt}I", sh_data, str_offset + 16)[0]
+                            tab_sz = struct.unpack_from(f"{fmt}I", sh_data, str_offset + 20)[0]
+                        elif ei_class == 2 and str_offset + 40 <= len(sh_data):
+                            tab_off = struct.unpack_from(f"{fmt}Q", sh_data, str_offset + 24)[0]
+                            tab_sz = struct.unpack_from(f"{fmt}Q", sh_data, str_offset + 32)[0]
+                        else:
+                            tab_off, tab_sz = 0, 0
+                        if tab_off > 0 and tab_off + tab_sz <= self.file_size:
+                            f.seek(tab_off)
+                            shstrtab = f.read(min(tab_sz, 64 * 1024))
+
+                    for i in range(shnum):
+                        s_off = i * shentsize
+                        if ei_class == 1:
+                            name_idx = struct.unpack_from(f"{fmt}I", sh_data, s_off)[0]
+                            flags = struct.unpack_from(f"{fmt}I", sh_data, s_off + 8)[0]
+                            vaddr = struct.unpack_from(f"{fmt}I", sh_data, s_off + 12)[0]
+                            offset_p = struct.unpack_from(f"{fmt}I", sh_data, s_off + 16)[0]
+                            size_p = struct.unpack_from(f"{fmt}I", sh_data, s_off + 20)[0]
+                        else:
+                            name_idx = struct.unpack_from(f"{fmt}I", sh_data, s_off)[0]
+                            flags = struct.unpack_from(f"{fmt}Q", sh_data, s_off + 8)[0]
+                            vaddr = struct.unpack_from(f"{fmt}Q", sh_data, s_off + 16)[0]
+                            offset_p = struct.unpack_from(f"{fmt}Q", sh_data, s_off + 24)[0]
+                            size_p = struct.unpack_from(f"{fmt}Q", sh_data, s_off + 32)[0]
+
+                        sec_name = ""
+                        if shstrtab and name_idx < len(shstrtab):
+                            null_p = shstrtab.find(b"\x00", name_idx)
+                            sec_name = shstrtab[name_idx:null_p if null_p != -1 else None].decode("latin1", errors="replace")
+                        if not sec_name:
+                            sec_name = f"elf_sec_{i}"
+
+                        sec_entropy = 0.0
+                        if size_p > 0 and offset_p + size_p <= self.file_size:
+                            f.seek(offset_p)
+                            sec_bytes = f.read(min(size_p, 512 * 1024))
+                            sec_entropy = calculate_entropy(sec_bytes)
+
+                        is_writable = bool(flags & 0x1) # SHF_WRITE
+                        is_executable = bool(flags & 0x4) # SHF_EXECINSTR
+
+                        if is_writable and is_executable:
+                            self.results["anomalies"].append(f"ELF Section {sec_name} is Writable and Executable (W+X) - potential unpacker / shellcode")
+
+                        self.results["sections"].append({
+                            "name": sec_name,
+                            "virtual_size": size_p,
+                            "virtual_address": f"0x{vaddr:X}",
+                            "raw_size": size_p,
+                            "entropy": sec_entropy,
+                            "executable": is_executable,
+                            "writable": is_writable
+                        })
+            except Exception:
+                pass
 
     def _parse_macho(self, header: bytes):
         self.results["format"] = "Mach-O"
+        if len(header) < 8:
+            return
         magic = struct.unpack(">I", header[:4])[0]
+
+        macho_arch_map = {
+            0x00000007: "x86 (32-bit)",
+            0x01000007: "x64 (x86_64)",
+            0x0000000C: "ARM (32-bit)",
+            0x0100000C: "ARM64 (AArch64)",
+            0x0200000C: "ARM64_32",
+            0x00000012: "PowerPC",
+            0x01000012: "PowerPC 64"
+        }
+
         if magic in (0xFEEDFACE, 0xCEFAEDFE):
             self.results["format"] = "Mach-O 32-bit"
+            endian = ">" if magic == 0xFEEDFACE else "<"
+            self.results["endianness"] = "big" if endian == ">" else "little"
+            cputype = struct.unpack(f"{endian}I", header[4:8])[0]
+            self.results["architecture"] = macho_arch_map.get(cputype, f"Mach-O CPU 0x{cputype:08X}")
         elif magic in (0xFEEDFACF, 0xCFFAEDFE):
             self.results["format"] = "Mach-O 64-bit"
-        elif magic == 0xCAFEBABE:
+            endian = ">" if magic == 0xFEEDFACF else "<"
+            self.results["endianness"] = "big" if endian == ">" else "little"
+            cputype = struct.unpack(f"{endian}I", header[4:8])[0]
+            self.results["architecture"] = macho_arch_map.get(cputype, f"Mach-O CPU 0x{cputype:08X}")
+        elif magic in (0xCAFEBABE, 0xBEBAFECA):
+            minor = struct.unpack(">H", header[4:6])[0]
+            major = struct.unpack(">H", header[6:8])[0]
+            if minor == 0 and 45 <= major <= 75:
+                self.results["format"] = f"Java Class Bytecode (v{major}.{minor})"
+                self.results["architecture"] = "JVM Bytecode"
+                self.results["runtimes"].append("Java Virtual Machine (JVM)")
+                return
+
             self.results["format"] = "Mach-O Universal (Fat Binary)"
+            endian = ">" if magic == 0xCAFEBABE else "<"
+            self.results["endianness"] = "big" if endian == ">" else "little"
+            nfat = struct.unpack(f"{endian}I", header[4:8])[0]
+            archs = []
+            if nfat <= 20 and len(header) >= 8 + nfat * 20:
+                for idx in range(nfat):
+                    arch_off = 8 + idx * 20
+                    cpu = struct.unpack(f"{endian}I", header[arch_off:arch_off+4])[0]
+                    arch_name = macho_arch_map.get(cpu, f"0x{cpu:08X}")
+                    archs.append(arch_name)
+            self.results["architecture"] = f"Multi-Arch ({', '.join(archs)})" if archs else "Universal (Fat Binary)"
 
     def _scan_runtimes_and_engines(self, data: bytes):
         # 1. Game Engines

@@ -154,6 +154,91 @@ class TestApexTriage(unittest.TestCase):
         t_py = BinaryTriager(py_path).analyze()
         self.assertIn("Python (PyInstaller Bundle)", t_py["runtimes"])
 
+    def test_macho_and_fat_binary_parsing(self):
+        # 1. Single-arch Mach-O 64-bit ARM64
+        macho_path = os.path.join(self.temp_dir.name, "arm64_bin")
+        with open(macho_path, "wb") as f:
+            f.write(struct.pack(">IIII", 0xFEEDFACF, 0x0100000C, 0, 2))
+        res_macho = BinaryTriager(macho_path).analyze()
+        self.assertEqual(res_macho["format"], "Mach-O 64-bit")
+        self.assertIn("ARM64", res_macho["architecture"])
+
+        # 2. Universal Fat Mach-O (x86_64 + ARM64)
+        fat_path = os.path.join(self.temp_dir.name, "universal_bin")
+        with open(fat_path, "wb") as f:
+            f.write(struct.pack(">II", 0xCAFEBABE, 2))
+            f.write(struct.pack(">IIIII", 0x01000007, 3, 0x1000, 0x1000, 12))
+            f.write(struct.pack(">IIIII", 0x0100000C, 0, 0x2000, 0x1000, 14))
+        res_fat = BinaryTriager(fat_path).analyze()
+        self.assertEqual(res_fat["format"], "Mach-O Universal (Fat Binary)")
+        self.assertIn("x64", res_fat["architecture"])
+        self.assertIn("ARM64", res_fat["architecture"])
+
+        # 3. Java class CA FE BA BE disambiguation
+        java_path = os.path.join(self.temp_dir.name, "Sample.class")
+        with open(java_path, "wb") as f:
+            f.write(struct.pack(">IHH", 0xCAFEBABE, 0, 61)) # Java 17 bytecode
+        res_java = BinaryTriager(java_path).analyze()
+        self.assertIn("Java Class Bytecode", res_java["format"])
+        self.assertEqual(res_java["architecture"], "JVM Bytecode")
+
+    def test_pe_out_of_bounds_section_anomaly(self):
+        pe_path = os.path.join(self.temp_dir.name, "corrupt.exe")
+        dos = bytearray(0x40)
+        dos[0:2] = b"MZ"
+        struct.pack_into("<I", dos, 0x3C, 0x40)
+
+        pe = bytearray(24)
+        pe[0:4] = b"PE\x00\x00"
+        struct.pack_into("<H", pe, 4, 0x8664) # x64
+        struct.pack_into("<H", pe, 6, 1)      # 1 section
+        struct.pack_into("<H", pe, 20, 0)     # no optional header
+
+        sec = bytearray(40)
+        sec[0:5] = b".evil"
+        struct.pack_into("<I", sec, 8, 0x1000)
+        struct.pack_into("<I", sec, 12, 0x1000)
+        struct.pack_into("<I", sec, 16, 0x5000) # raw size 20KB
+        struct.pack_into("<I", sec, 20, 0x1000) # raw ptr 4KB, but file is < 200 bytes
+
+        with open(pe_path, "wb") as f:
+            f.write(dos + pe + sec)
+
+        res = BinaryTriager(pe_path).analyze()
+        self.assertTrue(any("beyond file boundaries" in a for a in res["anomalies"]))
+
+    def test_elf_sections_and_anomalies(self):
+        elf_path = os.path.join(self.temp_dir.name, "test_sec.elf")
+        hdr = bytearray(64)
+        hdr[0:4] = b"\x7fELF"
+        hdr[4] = 2 # 64-bit
+        hdr[5] = 1 # little-endian
+        struct.pack_into("<H", hdr, 18, 0x3E) # x86_64
+        struct.pack_into("<Q", hdr, 24, 0x400000) # entry
+        struct.pack_into("<Q", hdr, 40, 64) # e_shoff at offset 64
+        struct.pack_into("<H", hdr, 58, 64) # e_shentsize = 64
+        struct.pack_into("<H", hdr, 60, 2)  # e_shnum = 2 sections
+        struct.pack_into("<H", hdr, 62, 0)  # shstrndx = 0
+
+        # Section 0: null section
+        sec0 = bytearray(64)
+        # Section 1: executable + writable section (W+X)
+        sec1 = bytearray(64)
+        struct.pack_into("<I", sec1, 0, 0)     # sh_name
+        struct.pack_into("<I", sec1, 4, 1)     # sh_type: SHT_PROGBITS
+        struct.pack_into("<Q", sec1, 8, 0x5)   # sh_flags: SHF_WRITE (0x1) | SHF_EXECINSTR (0x4)
+        struct.pack_into("<Q", sec1, 16, 0x500000) # sh_addr
+        struct.pack_into("<Q", sec1, 24, 192)  # sh_offset
+        struct.pack_into("<Q", sec1, 32, 64)   # sh_size
+
+        payload = b"\x90" * 64
+        with open(elf_path, "wb") as f:
+            f.write(hdr + sec0 + sec1 + payload)
+
+        res = BinaryTriager(elf_path).analyze()
+        self.assertEqual(len(res["sections"]), 2)
+        self.assertTrue(any("W+X" in a for a in res["anomalies"]))
+
 class TestMemoryDiff(unittest.TestCase):
     def test_memory_diffing_and_struct_synthesis(self):
         # 64 bytes memory snapshot
@@ -186,9 +271,13 @@ class TestMemoryDiff(unittest.TestCase):
         # Synthesize C++ and C# structs
         structs = differ.synthesize_struct("PlayerEntity")
         self.assertIn("struct PlayerEntity {", structs["cpp"])
-        self.assertIn("field_0x0004", structs["cpp"])
+        self.assertIn("int32_t field_0x0004;", structs["cpp"])
+        self.assertIn("float field_0x000C;", structs["cpp"])
+        self.assertIn("uintptr_t field_0x0018;", structs["cpp"])
         self.assertIn("[StructLayout(LayoutKind.Explicit)]", structs["csharp"])
-        self.assertIn("[FieldOffset(0x4)]", structs["csharp"])
+        self.assertIn("[FieldOffset(0x4)] public int field_0x0004;", structs["csharp"])
+        self.assertIn("[FieldOffset(0xC)] public float field_0x000C;", structs["csharp"])
+        self.assertIn("[FieldOffset(0x18)] public IntPtr field_0x0018;", structs["csharp"])
 
     def test_identical_memory_buffers(self):
         buf = b"\xAA" * 128
@@ -215,6 +304,22 @@ class TestKaitaiSynth(unittest.TestCase):
         self.assertIn("type: u4", ksy)
         self.assertIn("type: f4", ksy)
         self.assertIn("type: strz", ksy)
+
+    def test_kaitai_with_u64_and_u4(self):
+        # Test distinguishing true 64-bit integer (> 0xFFFFFFFF) from two 32-bit integers
+        raw = bytearray()
+        raw.extend(b"TEST") # 4 bytes
+        raw.extend(struct.pack("<I", 100)) # 4 bytes -> now at offset 8 (aligned to 8)
+        # At offset 8: true 64-bit value: 0x00007FF710000000
+        raw.extend(struct.pack("<Q", 0x00007FF710000000))
+        # At offset 16: two 32-bit integers (not collapsed into 64-bit)
+        raw.extend(struct.pack("<I", 500))
+        raw.extend(struct.pack("<I", 600))
+
+        synth = KaitaiSynthesizer(bytes(raw), struct_id="data_payload", endian="le")
+        ksy = synth.synthesize()
+        self.assertIn("type: u8", ksy)
+        self.assertIn("type: u4", ksy)
 
 class TestUnflattenTrace(unittest.TestCase):
     def test_unflattening_from_json(self):
@@ -252,6 +357,33 @@ class TestUnflattenTrace(unittest.TestCase):
         c_code = unflattener.reconstruct_c_code()
         self.assertIn("x = 10;", c_code)
         self.assertIn("return x;", c_code)
+
+    def test_unflattening_branching_and_loops(self):
+        # State machine with conditional branching and loop back-edge
+        trace = [
+            {"state": 10, "block": "BB_ENTRY", "code": "int i = 0;", "next_state": 20},
+            {"state": 20, "block": "BB_COND", "code": "", "successors": [(30, "i < 10"), (40, "i >= 10")]},
+            {"state": 30, "block": "BB_BODY", "code": "i++;", "next_state": 20}, # loop back-edge to 20
+            {"state": 40, "block": "BB_DONE", "code": "return i;", "next_state": None}
+        ]
+        # Register in custom format
+        unflattener = ControlFlowUnflattener([])
+        unflattener.entry_state = 10
+        unflattener.state_handlers = {
+            10: {"block": "BB_ENTRY", "code": "int i = 0;", "successors": [(20, None)]},
+            20: {"block": "BB_COND", "code": "", "successors": [(30, "i < 10"), (40, "i >= 10")]},
+            30: {"block": "BB_BODY", "code": "i++;", "successors": [(20, None)]},
+            40: {"block": "BB_DONE", "code": "return i;", "successors": []}
+        }
+        c_code = unflattener.reconstruct_c_code()
+        # Verify labels exist
+        self.assertIn("state_0x14:", c_code) # state 20
+        self.assertIn("state_0x1E:", c_code) # state 30
+        self.assertIn("state_0x28:", c_code) # state 40
+        # Verify goto targets exist
+        self.assertIn("goto state_0x1E;", c_code)
+        self.assertIn("goto state_0x28;", c_code)
+        self.assertIn("goto state_0x14;", c_code)
 
 if __name__ == "__main__":
     unittest.main()
