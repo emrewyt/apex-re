@@ -12,7 +12,7 @@
 Apex-RE is an open-source reverse engineering research toolkit and AI agent skill. If you discover a vulnerability or security flaw in any of the bundled analysis scripts:
 
 1. Do not open a public GitHub issue.
-2. Contact the maintainer directly or email security@fluvea.com with a reproduction scenario.
+2. Contact the maintainer directly or email realwespcai@gmail.com with a reproduction scenario.
 3. You will receive an initial response within 48 hours.
 
 ## Intended Purpose & Ethical Research
